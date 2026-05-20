@@ -153,7 +153,8 @@ void StartDefaultTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    osDelay(3000);
+		App_bootloader_work();
   }
   /* USER CODE END StartDefaultTask */
 }

@@ -72,7 +72,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
- 
+  
 
   /* USER CODE END 1 */
 
@@ -112,16 +112,16 @@ int main(void)
 
   /* Start scheduler */
   osKernelStart();
-
+ 
   /* We should never get here as control is now taken by the scheduler */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-    osDelay(3000); 
+    osDelay(1); 
     //Int_bootloader_jump_to_app();  //测试跳转到应用程序
-
+    //App_bootloader_work();  //测试bootloader的工作流程
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

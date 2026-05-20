@@ -18,7 +18,7 @@
  * 
  * 
  */
-void Int_bootloader_init(void);
+void Int_bootloader_receive_app(void);
 
 
 /**

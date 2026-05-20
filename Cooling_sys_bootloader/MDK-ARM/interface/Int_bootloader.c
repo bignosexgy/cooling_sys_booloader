@@ -19,6 +19,8 @@ uint16_t uart_rec_len = 0;
 uint16_t uart_rec_full_len = 0;
 //记录写入程序地址的偏移量
 uint32_t flash_write_offset = 0;
+//记录当前一次接受数据的时间
+uint32_t last_rec_time = 0;
 //末尾是一个字节
 uint8_t last_byte = 0;
 uint8_t last_byte_flag = 0; //标记末尾字节是否有效
@@ -165,6 +167,8 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
 {
   if(huart->Instance == UART4)  
   {
+    //接受到数据，记录stm32当前的系统时间,mS
+    last_rec_time = HAL_GetTick();
     //保存接收数据的长度
     uart_rec_len = Size;
     uart_rec_full_len += uart_rec_len;
@@ -231,7 +235,7 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
  *brief  串口接受 =>   准备接收A程序 
  * 
  */
-void Int_bootloader_init(void)
+void Int_bootloader_receive_app(void)
 {
     //清空掉初始化串口使用之前的所有问题
     __HAL_UART_CLEAR_OREFLAG(&huart4);
@@ -249,21 +253,20 @@ void Int_bootloader_init(void)
 void Int_bootloader_jump_to_app(void)
 {
  
-  typedef void(* pFunc)(void);
-  //关闭中断
-  __disable_irq();
+  typedef void(*pFunc)(void);
+  
   //跳转到应用程序
   //获取应用程序的复位地址和入口地址
-  uint32_t app_reset_addr = *(volatile uint32_t *)APP_START_ADDR; //复位地址
-  uint32_t app_entry_addr = *(volatile uint32_t *)(APP_START_ADDR + 4); //入口地址
+  //uint32_t app_reset_addr = *(volatile uint32_t *)APP_START_ADDR; //复位地址
+  //uint32_t app_entry_addr = *(volatile uint32_t *)(APP_START_ADDR + 4); //入口地址
 
   //设置主堆栈指针
-  __set_MSP(app_reset_addr);
+  //__set_MSP(app_reset_addr);
 
   //跳转到应用程序的入口地址
-  typedef void (*app_entry_t)(void);
-  app_entry_t app_entry = (app_entry_t)app_entry_addr;
-  app_entry();
+  //typedef void (*app_entry_t)(void);
+  //app_entry_t app_entry = (app_entry_t)app_entry_addr;
+  //app_entry();
 
 
   //获取栈顶地址的值
@@ -293,6 +296,12 @@ void Int_bootloader_jump_to_app(void)
   }
   //注销bootloader程序
   
+  //关闭中断
+  __disable_irq();
+
+  // 4. 停止 FreeRTOS (如果还在运行)
+  vTaskEndScheduler();
+
   //一下几条命令注销内核  
   NVIC_DisableIRQ (EXTI9_5_IRQn);       //注销外设  
   NVIC_DisableIRQ(UART4_IRQn);          //注销串口4
@@ -300,18 +309,28 @@ void Int_bootloader_jump_to_app(void)
   SysTick->VAL = 0;                     //清空系统滴答定时器的计数值
   SysTick->LOAD = 0;                    //清空系统滴答定时器的重装载值
   
+  // 6. 清除所有 NVIC 中断挂起标志 (防止旧中断干扰)
+  for(int i=0; i<8; i++) {
+    NVIC->ICER[i] = 0xFFFFFFFF;
+    NVIC->ICPR[i] = 0xFFFFFFFF;
+  }
+  
   //关闭中断
-  __disable_irq();
+  //__disable_irq();
   //注销hal库设置
 
-  HAL_DeInit();
-  //设置堆栈指针
-  __set_MSP(app_stack_ptr);
+  //HAL_DeInit();
+ 
 
   //重定向中断向量表
   SCB->VTOR = APP_START_ADDR;
 
+   //设置堆栈指针
+  __set_MSP(app_stack_ptr);
+
   //跳转到A程序复位中断
   pFunc jump_to_app = (pFunc)app_reset_handler; 
   jump_to_app();
+
+  //return 0;
 }
